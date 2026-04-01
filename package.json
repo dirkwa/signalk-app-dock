@@ -5,6 +5,7 @@
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-webapp",
+    "signalk-plugin-configurator",
     "signalk-category-instruments"
   ],
   "signalk-plugin-enabled-by-default": true,
@@ -14,11 +15,21 @@
   },
   "main": "plugin/index.js",
   "scripts": {
+    "build:config": "webpack",
+    "prepublishOnly": "webpack",
     "test": "echo \"No tests yet\""
   },
   "author": "",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-react": "^7.28.5",
+    "babel-loader": "^10.1.1",
+    "react": "^19.2.4",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2"
   }
 }

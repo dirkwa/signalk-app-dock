@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8e8e93"/>
+      <stop offset="100%" stop-color="#636366"/>
+    </linearGradient>
+  </defs>
+  <rect width="72" height="72" rx="16" fill="url(#bg)"/>
+  <g transform="translate(36,36)">
+    <!-- Gear body -->
+    <path d="
+      M-2.8-16.5 a2.8 2.8 0 0 1 5.6 0 l.4 2.8 a13 13 0 0 1 3.6 1.5 l2.4-1.4 a2.8 2.8 0 0 1 3.8 1 l2.8 4.9 a2.8 2.8 0 0 1-1 3.8 l-2 1.4 a13 13 0 0 1 0 3.9 l2 1.4 a2.8 2.8 0 0 1 1 3.8 l-2.8 4.9 a2.8 2.8 0 0 1-3.8 1 l-2.4-1.4 a13 13 0 0 1-3.6 1.5 l-.4 2.8 a2.8 2.8 0 0 1-5.6 0 l-.4-2.8 a13 13 0 0 1-3.6-1.5 l-2.4 1.4 a2.8 2.8 0 0 1-3.8-1 l-2.8-4.9 a2.8 2.8 0 0 1 1-3.8 l2-1.4 a13 13 0 0 1 0-3.9 l-2-1.4 a2.8 2.8 0 0 1-1-3.8 l2.8-4.9 a2.8 2.8 0 0 1 3.8-1 l2.4 1.4 a13 13 0 0 1 3.6-1.5 Z
+    " fill="#e5e5ea" stroke="none"/>
+    <!-- Center hole -->
+    <circle r="5.5" fill="url(#bg)"/>
+    <!-- Inner ring highlight -->
+    <circle r="5.5" fill="none" stroke="#c7c7cc" stroke-width="1"/>
+    <!-- Outer subtle highlight -->
+    <circle r="9" fill="none" stroke="#d1d1d6" stroke-width="0.5" opacity="0.5"/>
+  </g>
+</svg>
