@@ -10,27 +10,33 @@
     iconSize:            56,
     magnification:       true,
     magnificationScale:  1.7,
-    apps: [
-      { label: 'KIP',       url: '/kip/',                   icon: '/kip/assets/icon-72x72.png', color: '#0d1b2a' },
-      { label: 'Freeboard', url: '/@signalk/freeboard-sk/', icon: '/@signalk/freeboard-sk/assets/icons/icon-72x72.png', color: '#1b2838' },
-      { label: 'Radar',     url: '/radar/',                 icon: '/radar/assets/icon-72x72.png', color: '#1a0a0a' }
-    ]
+    apps: []
   }
 
-  // ─── Load config from plugin endpoint ────────────────────────────────────────
+  // ─── Load config from plugin endpoints ───────────────────────────────────────
   let cfg = { ...DEFAULTS }
   try {
-    const res = await fetch('/plugins/signalk-app-dock/config')
-    if (res.ok) {
-      const data = await res.json()
-      cfg = { ...DEFAULTS, ...data }
+    const [configRes, settingsRes] = await Promise.all([
+      fetch('/plugins/signalk-app-dock/config'),
+      fetch('/plugins/signalk-app-dock/settings')
+    ])
+    if (configRes.ok) {
+      const data = await configRes.json()
+      const pluginCfg = data.configuration || data
+      cfg = { ...DEFAULTS, ...pluginCfg }
+    }
+    if (settingsRes.ok) {
+      const data = await settingsRes.json()
+      if (Array.isArray(data.apps) && data.apps.length > 0) {
+        cfg.apps = data.apps
+      }
     }
   } catch (e) {
     console.warn('[Dock] Could not load config, using defaults.', e)
   }
 
   if (!Array.isArray(cfg.apps) || cfg.apps.length === 0) {
-    cfg.apps = DEFAULTS.apps
+    console.warn('[Dock] No apps configured — open Plugin Config to add webapps.')
   }
 
   // ─── DOM refs ────────────────────────────────────────────────────────────────
@@ -64,6 +70,10 @@
 
   // ─── Idle hint ───────────────────────────────────────────────────────────────
   function setIdleHint () {
+    if (!cfg.apps || cfg.apps.length === 0) {
+      $idleHintText.textContent = 'No apps configured \u2014 add webapps in Plugin Config \u2192 App Dock'
+      return
+    }
     const trigger = cfg.trigger
     if (trigger === 'longpress') {
       $idleHintText.textContent = 'Long-press corner to open dock'
@@ -338,27 +348,61 @@
     $triggerCorner.style[horiz] = '0'
   }
 
-  // ─── Gesture: long-press on corner ───────────────────────────────────────────
+  // ─── Gesture: long-press on corner (touch + mouse) ────────────────────────────
   if (cfg.trigger === 'longpress' || cfg.trigger === 'both') {
     let pressTimer  = null
     let pressActive = false
 
-    $triggerCorner.addEventListener('touchstart', (e) => {
+    const startPress = () => {
       pressActive = true
       pressTimer  = setTimeout(() => {
         if (!pressActive) return
         showDock()
         if (navigator.vibrate) navigator.vibrate(8)
       }, cfg.longPressDuration)
-    }, { passive: true })
+    }
 
     const cancelPress = () => {
       pressActive = false
       clearTimeout(pressTimer)
     }
+
+    $triggerCorner.addEventListener('touchstart', startPress, { passive: true })
     $triggerCorner.addEventListener('touchend',    cancelPress, { passive: true })
     $triggerCorner.addEventListener('touchcancel', cancelPress, { passive: true })
     $triggerCorner.addEventListener('touchmove', () => cancelPress(), { passive: true })
+
+    $triggerCorner.addEventListener('mousedown', startPress)
+    $triggerCorner.addEventListener('mouseup',   cancelPress)
+    $triggerCorner.addEventListener('mouseleave', cancelPress)
+  }
+
+  // ─── Gesture: mouse hover at screen edge ─────────────────────────────────────
+  {
+    const EDGE_ZONE = 4
+    let edgeTimer = null
+
+    document.addEventListener('mousemove', (e) => {
+      if (dockVisible) return
+      const W = window.innerWidth
+      const H = window.innerHeight
+      let atEdge = false
+
+      if (pos === 'bottom' && e.clientY >= H - EDGE_ZONE) atEdge = true
+      if (pos === 'top'    && e.clientY <= EDGE_ZONE)      atEdge = true
+      if (pos === 'left'   && e.clientX <= EDGE_ZONE)      atEdge = true
+      if (pos === 'right'  && e.clientX >= W - EDGE_ZONE)  atEdge = true
+
+      if (atEdge && !edgeTimer) {
+        edgeTimer = setTimeout(() => {
+          showDock()
+          edgeTimer = null
+        }, 300)
+      } else if (!atEdge && edgeTimer) {
+        clearTimeout(edgeTimer)
+        edgeTimer = null
+      }
+    })
   }
 
   // ─── Gesture: swipe from edge ────────────────────────────────────────────────

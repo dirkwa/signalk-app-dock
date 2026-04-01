@@ -1,41 +1,87 @@
 'use strict'
 
 module.exports = (app) => {
-  let currentSettings = {}
+  let pluginSettings = {}
+  let resolvedApps = []
+
+  function getWebapps () {
+    return (app.webapps || [])
+      .filter(w => w.name !== 'signalk-app-dock' && w.name !== '@signalk/server-admin-ui')
+      .map(w => ({
+        name:  w.name,
+        label: w.signalk?.displayName || w.name,
+        url:   `/${w.name}/`,
+        icon:  w.signalk?.appIcon ? `/${w.name}/${w.signalk.appIcon}` : null
+      }))
+  }
 
   const plugin = {
     id: 'signalk-app-dock',
     name: 'App Dock',
 
     start (settings) {
-      currentSettings = settings
+      pluginSettings = settings
+
+      setTimeout(() => {
+        const discovered = getWebapps()
+        if (discovered.length === 0) return
+
+        const configured = settings.apps || []
+        const configuredUrls = new Set(configured.map(a => a.url))
+
+        const merged = [...configured]
+        let added = false
+        for (const w of discovered) {
+          if (!configuredUrls.has(w.url)) {
+            merged.push({ enabled: true, url: w.url, label: '', icon: '', color: '' })
+            added = true
+          }
+        }
+
+        const discoveredByUrl = {}
+        discovered.forEach(d => { discoveredByUrl[d.url] = d })
+
+        resolvedApps = merged
+          .filter(a => a.enabled !== false)
+          .map(a => {
+            const match = discoveredByUrl[a.url]
+            return {
+              label: a.label || (match && match.label) || a.url,
+              url:   a.url,
+              icon:  a.icon || (match && match.icon) || null,
+              color: a.color || null
+            }
+          })
+
+        if (added) {
+          app.savePluginOptions({ ...settings, apps: merged }, (err) => {
+            if (err) app.error('Failed to save discovered apps: ' + err.message)
+            else app.debug('Auto-discovered new webapps, saved to config')
+          })
+        }
+
+        app.debug('Dock apps: %s', resolvedApps.map(a => a.label).join(', '))
+      }, 5000)
     },
 
     stop () {},
 
     registerWithRouter (router) {
-      router.get('/config', (req, res) => {
-        res.json(currentSettings)
+      router.get('/settings', (req, res) => {
+        res.json({
+          ...pluginSettings,
+          apps: resolvedApps
+        })
       })
 
       router.get('/webapps', (req, res) => {
-        try {
-          const webapps = (app.webapps || []).map(w => ({
-            name:    w.name,
-            label:   w.metadata?.displayName || w.name,
-            url:     `/${w.name}/`,
-            icon:    w.metadata?.appIcon ? `/${w.name}/${w.metadata.appIcon}` : null
-          }))
-          res.json(webapps)
-        } catch (err) {
-          app.debug('Could not enumerate webapps: %s', err.message)
-          res.json([])
-        }
+        res.json(getWebapps())
       })
     },
 
     schema: {
       type: 'object',
+      description: 'Open /signalk-app-dock/config.html for the visual configurator with discover button and drag-to-reorder.',
       required: [],
       properties: {
 
@@ -98,38 +144,38 @@ module.exports = (app) => {
 
         apps: {
           type: 'array',
-          title: 'Apps',
-          description: 'Ordered list of apps shown in the dock',
+          title: 'Dock Apps',
+          description:
+            'Installed webapps are added here automatically. Reorder, disable, or override labels/icons as needed.',
           items: {
             type: 'object',
-            required: ['label', 'url'],
+            required: ['url'],
             properties: {
-              label: {
-                type: 'string',
-                title: 'Label'
+              enabled: {
+                type: 'boolean',
+                title: 'Enabled',
+                default: true
               },
               url: {
                 type: 'string',
-                title: 'URL (relative or absolute)',
-                description: 'e.g. /kip/ or /@signalk/freeboard-sk/'
+                title: 'URL'
+              },
+              label: {
+                type: 'string',
+                title: 'Label override'
               },
               icon: {
                 type: 'string',
-                title: 'Icon',
-                description: 'Emoji or path to an image'
+                title: 'Icon override',
+                description: 'Emoji or image path'
               },
               color: {
                 type: 'string',
-                title: 'Icon background color',
-                description: 'CSS color, e.g. #1a1a2e or rgba(0,100,200,0.8)'
+                title: 'Background color'
               }
             }
           },
-          default: [
-            { label: 'KIP',       url: '/kip/',                     icon: '/kip/assets/icon-72x72.png', color: '#0d1b2a' },
-            { label: 'Freeboard', url: '/@signalk/freeboard-sk/',   icon: '/@signalk/freeboard-sk/assets/icons/icon-72x72.png', color: '#1b2838' },
-            { label: 'Radar',     url: '/radar/',                   icon: '/radar/assets/icon-72x72.png', color: '#1a0a0a' }
-          ]
+          default: []
         }
       }
     }

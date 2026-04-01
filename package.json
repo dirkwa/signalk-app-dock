@@ -9,7 +9,8 @@
   ],
   "signalk-plugin-enabled-by-default": true,
   "signalk": {
-    "displayName": "App Dock"
+    "displayName": "App Dock",
+    "appIcon": "./app-icon.svg"
   },
   "main": "plugin/index.js",
   "scripts": {
