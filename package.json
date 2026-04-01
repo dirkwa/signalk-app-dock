@@ -19,7 +19,7 @@
     "prepublishOnly": "webpack",
     "format": "prettier --write '**/*.{js,json,md,css,html}' && eslint --fix .",
     "lint": "eslint .",
-    "test": "node --test 'test/**/*.test.js'"
+    "test": "node --test test/plugin.test.js"
   },
   "author": "",
   "license": "Apache-2.0",
