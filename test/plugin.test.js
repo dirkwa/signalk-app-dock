@@ -55,7 +55,6 @@ describe('schema', () => {
     const plugin = pluginFactory(createMockApp())
     const props = Object.keys(plugin.schema.properties)
     assert.ok(props.includes('position'))
-    assert.ok(props.includes('trigger'))
     assert.ok(props.includes('triggerCorner'))
     assert.ok(props.includes('iframeMode'))
     assert.ok(props.includes('iconSize'))

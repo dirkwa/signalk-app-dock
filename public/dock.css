@@ -39,30 +39,58 @@ body {
   display: block;
 }
 
-/* ─── Idle hint ─────────────────────────────────────────────────────────────── */
+/* ─── Welcome screen ───────────────────────────────────────────────────────── */
 #idle-hint {
   position: fixed;
   inset: 0;
   z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   pointer-events: none;
   opacity: 0;
-  animation: idle-fade-in 1.2s ease 0.8s forwards;
+  animation: idle-fade-in 1.2s ease 0.6s forwards;
 }
 
 #idle-hint.hidden {
   display: none;
 }
 
-#idle-hint-text {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 14px;
+#idle-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+#idle-title {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#idle-version {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
+  margin-top: -8px;
+}
+
+#idle-hint-text {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   text-align: center;
   padding: 0 32px;
+  max-width: 480px;
+  line-height: 1.6;
+  margin-top: 12px;
 }
 
 @keyframes idle-fade-in {
@@ -335,9 +363,13 @@ body {
 #trigger-corner {
   position: fixed;
   z-index: 9;
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   pointer-events: auto;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ─── Loading overlay ───────────────────────────────────────────────────────── */

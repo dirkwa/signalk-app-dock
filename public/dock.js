@@ -3,9 +3,7 @@
 
   const DEFAULTS = {
     position: 'bottom',
-    trigger: 'both',
     triggerCorner: 'bottom-right',
-    longPressDuration: 400,
     iframeMode: 'keep-alive',
     iconSize: 56,
     magnification: true,
@@ -67,20 +65,40 @@
   const MAG_SCALE = Math.max(1, Math.min(cfg.magnificationScale || 1.7, 2.5))
   const MAG_RADIUS = cfg.iconSize * 3.5
 
-  // ─── Idle hint ───────────────────────────────────────────────────────────────
+  // ─── Welcome screen ──────────────────────────────────────────────────────────
   function setIdleHint() {
+    const $version = document.getElementById('idle-version')
+    if ($version) {
+      fetch('/skServer/webapps')
+        .then((r) => r.json())
+        .then((apps) => {
+          const me = apps.find((a) => a.name === 'signalk-app-dock')
+          if (me) $version.textContent = 'v' + me.version
+        })
+        .catch(() => {})
+    }
+
     if (!cfg.apps || cfg.apps.length === 0) {
-      $idleHintText.textContent = 'No apps configured \u2014 add webapps in Plugin Config \u2192 App Dock'
+      $idleHintText.innerHTML =
+        'No apps configured yet.<br>' +
+        'Open <strong>Admin UI \u2192 Plugin Config \u2192 App Dock</strong><br>' +
+        'and click <strong>Discover Installed Webapps</strong> to get started.'
       return
     }
-    const trigger = cfg.trigger
-    if (trigger === 'longpress') {
-      $idleHintText.textContent = 'Long-press corner to open dock'
-    } else if (trigger === 'swipe') {
-      $idleHintText.textContent = 'Swipe from edge to open dock'
-    } else {
-      $idleHintText.textContent = 'Long-press corner or swipe from edge to open dock'
+
+    const cornerNames = {
+      'bottom-right': 'bottom-right',
+      'bottom-left': 'bottom-left',
+      'top-right': 'top-right',
+      'top-left': 'top-left'
     }
+    const corner = cornerNames[cfg.triggerCorner] || 'bottom-right'
+
+    $idleHintText.innerHTML =
+      'Double-tap the <strong>' +
+      corner +
+      ' corner</strong> to open the dock' +
+      '<br><br><span style="font-size:12px;opacity:0.6">Configure in Admin UI \u2192 Plugin Config \u2192 App Dock</span>'
   }
 
   function hideIdleHint() {
@@ -354,7 +372,7 @@
   // ─── Corner trigger zone: position it ────────────────────────────────────────
   function positionCornerZone() {
     const [vert, horiz] = cfg.triggerCorner.split('-')
-    const sz = 80
+    const sz = 120
 
     $triggerCorner.style.width = sz + 'px'
     $triggerCorner.style.height = sz + 'px'
@@ -368,33 +386,33 @@
     $triggerCorner.style[horiz] = '0'
   }
 
-  // ─── Gesture: long-press on corner (touch + mouse) ────────────────────────────
-  if (cfg.trigger === 'longpress' || cfg.trigger === 'both') {
-    let pressTimer = null
-    let pressActive = false
+  // ─── Gesture: double-tap on corner (touch) + double-click (mouse) ─────────────
+  {
+    let lastTapTime = 0
+    const DOUBLE_TAP_MS = 400
 
-    const startPress = () => {
-      pressActive = true
-      pressTimer = setTimeout(() => {
-        if (!pressActive) return
-        showDock()
-        if (navigator.vibrate) navigator.vibrate(8)
-      }, cfg.longPressDuration)
-    }
+    $triggerCorner.addEventListener(
+      'touchend',
+      (e) => {
+        const now = Date.now()
+        if (now - lastTapTime < DOUBLE_TAP_MS) {
+          e.preventDefault()
+          lastTapTime = 0
+          showDock()
+          if (navigator.vibrate) navigator.vibrate(8)
+        } else {
+          lastTapTime = now
+        }
+      },
+      { passive: false }
+    )
 
-    const cancelPress = () => {
-      pressActive = false
-      clearTimeout(pressTimer)
-    }
+    $triggerCorner.addEventListener('dblclick', (e) => {
+      e.preventDefault()
+      showDock()
+    })
 
-    $triggerCorner.addEventListener('touchstart', startPress, { passive: true })
-    $triggerCorner.addEventListener('touchend', cancelPress, { passive: true })
-    $triggerCorner.addEventListener('touchcancel', cancelPress, { passive: true })
-    $triggerCorner.addEventListener('touchmove', () => cancelPress(), { passive: true })
-
-    $triggerCorner.addEventListener('mousedown', startPress)
-    $triggerCorner.addEventListener('mouseup', cancelPress)
-    $triggerCorner.addEventListener('mouseleave', cancelPress)
+    $triggerCorner.addEventListener('contextmenu', (e) => e.preventDefault())
   }
 
   // ─── Gesture: mouse hover at screen edge ─────────────────────────────────────
@@ -425,84 +443,14 @@
     })
   }
 
-  // ─── Gesture: swipe from edge ────────────────────────────────────────────────
-  if (cfg.trigger === 'swipe' || cfg.trigger === 'both') {
-    const EDGE_ZONE = 18
-    const SWIPE_MIN = 48
-    const AXIS_LIMIT = 60
-
-    let swipeArmed = false
-    let swipeStartX = 0
-    let swipeStartY = 0
-
-    document.addEventListener(
-      'touchstart',
-      (e) => {
-        if (dockVisible) return
-        swipeArmed = false
-        const t = e.touches[0]
-        const W = window.innerWidth
-        const H = window.innerHeight
-        swipeStartX = t.clientX
-        swipeStartY = t.clientY
-
-        if (pos === 'bottom' && t.clientY > H - EDGE_ZONE) swipeArmed = true
-        if (pos === 'top' && t.clientY < EDGE_ZONE) swipeArmed = true
-        if (pos === 'left' && t.clientX < EDGE_ZONE) swipeArmed = true
-        if (pos === 'right' && t.clientX > W - EDGE_ZONE) swipeArmed = true
-      },
-      { passive: true, capture: true }
-    )
-
-    document.addEventListener(
-      'touchmove',
-      (e) => {
-        if (!swipeArmed) return
-        const t = e.touches[0]
-        const dx = t.clientX - swipeStartX
-        const dy = t.clientY - swipeStartY
-
-        const perp = pos === 'bottom' || pos === 'top' ? Math.abs(dx) : Math.abs(dy)
-        if (perp > AXIS_LIMIT) swipeArmed = false
-      },
-      { passive: true, capture: true }
-    )
-
-    document.addEventListener(
-      'touchend',
-      (e) => {
-        if (!swipeArmed || dockVisible) {
-          swipeArmed = false
-          return
-        }
-        const t = e.changedTouches[0]
-        const dx = t.clientX - swipeStartX
-        const dy = t.clientY - swipeStartY
-        swipeArmed = false
-
-        if (pos === 'bottom' && dy < -SWIPE_MIN) {
-          showDock()
-          if (navigator.vibrate) navigator.vibrate(8)
-        }
-        if (pos === 'top' && dy > SWIPE_MIN) {
-          showDock()
-          if (navigator.vibrate) navigator.vibrate(8)
-        }
-        if (pos === 'left' && dx > SWIPE_MIN) {
-          showDock()
-          if (navigator.vibrate) navigator.vibrate(8)
-        }
-        if (pos === 'right' && dx < -SWIPE_MIN) {
-          showDock()
-          if (navigator.vibrate) navigator.vibrate(8)
-        }
-      },
-      { passive: true, capture: true }
-    )
-  }
-
   // ─── Init ────────────────────────────────────────────────────────────────────
   positionCornerZone()
   buildDock()
-  setIdleHint()
+
+  const autostartIdx = cfg.apps.findIndex((a) => a.autostart)
+  if (autostartIdx >= 0) {
+    switchToApp(autostartIdx)
+  } else {
+    setIdleHint()
+  }
 })()

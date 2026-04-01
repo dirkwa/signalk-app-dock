@@ -175,9 +175,7 @@ export default function PluginConfigurationPanel({ configuration, save }) {
   const cfg = configuration || {}
   const [apps, setApps] = useState(() => cfg.apps || [])
   const [position, setPosition] = useState(cfg.position || 'bottom')
-  const [trigger, setTrigger] = useState(cfg.trigger || 'both')
   const [triggerCorner, setTriggerCorner] = useState(cfg.triggerCorner || 'bottom-right')
-  const [longPressDuration, setLongPressDuration] = useState(cfg.longPressDuration || 400)
   const [iframeMode, setIframeMode] = useState(cfg.iframeMode || 'keep-alive')
   const [iconSize, setIconSize] = useState(cfg.iconSize || 56)
   const [magnification, setMagnification] = useState(cfg.magnification !== false)
@@ -195,16 +193,14 @@ export default function PluginConfigurationPanel({ configuration, save }) {
   const buildConfig = useCallback(
     (appsList) => ({
       position,
-      trigger,
       triggerCorner,
-      longPressDuration,
       iframeMode,
       iconSize,
       magnification,
       magnificationScale,
       apps: appsList
     }),
-    [position, trigger, triggerCorner, longPressDuration, iframeMode, iconSize, magnification, magnificationScale]
+    [position, triggerCorner, iframeMode, iconSize, magnification, magnificationScale]
   )
 
   const doSave = useCallback(() => {
@@ -255,6 +251,7 @@ export default function PluginConfigurationPanel({ configuration, save }) {
         if (!existingUrls.has(w.url)) {
           merged.push({
             enabled: true,
+            autostart: false,
             url: w.url,
             label: w.label || '',
             icon: w.icon || '',
@@ -279,6 +276,8 @@ export default function PluginConfigurationPanel({ configuration, save }) {
   }
 
   const toggleApp = (i) => setApps(apps.map((a, j) => (j === i ? { ...a, enabled: !a.enabled } : a)))
+  const toggleAutostart = (i) =>
+    setApps(apps.map((a, j) => (j === i ? { ...a, autostart: !a.autostart } : { ...a, autostart: false })))
   const removeApp = (i) => setApps(apps.filter((_, j) => j !== i))
 
   const onDragStart = (i) => setDragIdx(i)
@@ -322,18 +321,7 @@ export default function PluginConfigurationPanel({ configuration, save }) {
       />
 
       <SelectField
-        label="Show trigger"
-        value={trigger}
-        onChange={setTrigger}
-        options={[
-          { value: 'both', label: 'Long-press + Swipe' },
-          { value: 'longpress', label: 'Long-press only' },
-          { value: 'swipe', label: 'Swipe only' }
-        ]}
-      />
-
-      <SelectField
-        label="Long-press corner"
+        label="Double-tap corner"
         value={triggerCorner}
         onChange={setTriggerCorner}
         options={[
@@ -343,8 +331,6 @@ export default function PluginConfigurationPanel({ configuration, save }) {
           { value: 'top-left', label: 'Top-left' }
         ]}
       />
-
-      <NumberField label="Long-press duration" value={longPressDuration} onChange={setLongPressDuration} hint="ms" />
 
       <SelectField
         label="iFrame lifecycle"
@@ -406,13 +392,26 @@ export default function PluginConfigurationPanel({ configuration, save }) {
                 <div style={S.name}>{app.label || app.url}</div>
                 <div style={S.url}>{app.url}</div>
               </div>
-              <div style={S.toggle}>
+              <div style={S.toggle} title="Enabled">
                 <input
                   type="checkbox"
                   checked={app.enabled !== false}
                   onChange={() => toggleApp(i)}
                   style={S.checkbox}
                 />
+              </div>
+              <div
+                style={{
+                  ...S.toggle,
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  opacity: app.autostart ? 1 : 0.25,
+                  title: 'Autostart'
+                }}
+                onClick={() => toggleAutostart(i)}
+                title={app.autostart ? 'Autostart: ON (click to disable)' : 'Click to set as autostart app'}
+              >
+                {'\u25b6'}
               </div>
               <button style={{ ...S.btn, ...S.btnDanger }} onClick={() => removeApp(i)}>
                 Remove

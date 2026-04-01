@@ -51,7 +51,8 @@ module.exports = (app) => {
               label: a.label || (match && match.label) || a.url,
               url: a.url,
               icon: a.icon || (match && match.icon) || null,
-              color: a.color || null
+              color: a.color || null,
+              autostart: a.autostart || false
             }
           })
 
@@ -94,26 +95,12 @@ module.exports = (app) => {
           default: 'bottom'
         },
 
-        trigger: {
-          type: 'string',
-          title: 'Show trigger',
-          description: 'How the dock is revealed',
-          enum: ['longpress', 'swipe', 'both'],
-          default: 'both'
-        },
-
         triggerCorner: {
           type: 'string',
-          title: 'Long-press corner',
-          description: 'Screen corner that activates the dock on long-press',
+          title: 'Double-tap corner',
+          description: 'Screen corner that activates the dock on double-tap',
           enum: ['bottom-right', 'bottom-left', 'top-right', 'top-left'],
           default: 'bottom-right'
-        },
-
-        longPressDuration: {
-          type: 'number',
-          title: 'Long-press duration (ms)',
-          default: 400
         },
 
         iframeMode: {
@@ -157,6 +144,12 @@ module.exports = (app) => {
                 type: 'boolean',
                 title: 'Enabled',
                 default: true
+              },
+              autostart: {
+                type: 'boolean',
+                title: 'Autostart',
+                description: 'Load this app automatically when the dock page opens',
+                default: false
               },
               url: {
                 type: 'string',
