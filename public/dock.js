@@ -52,7 +52,6 @@
 
   // ─── State ───────────────────────────────────────────────────────────────────
   let dockVisible = false
-  let activeIndex = -1
   const iframes = {}
 
   // ─── Apply dock position class & alignment ───────────────────────────────────
@@ -349,7 +348,6 @@
     }
 
     iframes[app.url].classList.add('active')
-    activeIndex = index
     hideDock()
   }
 
