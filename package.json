@@ -2,6 +2,9 @@
   "name": "@signalk/app-dock",
   "version": "0.1.5",
   "description": "macOS-style configurable app dock for switching between SignalK webapps on touch screens",
+  "repository": {
+    "url": "https://github.com/SignalK/app-dock"
+  },
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-webapp",
