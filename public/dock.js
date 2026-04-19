@@ -12,26 +12,79 @@
     apps: []
   }
 
+  // Fallback app list used when we can't read server config — i.e. the
+  // visitor is anonymous on a server with `allow_readonly` enabled, so
+  // /plugins/* 403s. Mirrors the server-side DEFAULT_APPS in plugin/index.js
+  // so the demo at demo.signalk.org behaves sensibly for non-logged-in users.
+  const ANONYMOUS_DEFAULTS = {
+    showNightModeButton: true,
+    apps: [
+      {
+        enabled: true,
+        autostart: true,
+        url: '/@signalk/freeboard-sk/',
+        label: 'Freeboard-SK',
+        icon: '/@signalk/freeboard-sk/assets/icons/icon-72x72.png',
+        color: ''
+      },
+      {
+        enabled: true,
+        autostart: false,
+        url: '/@mxtommy/kip/',
+        label: 'KIP',
+        icon: '/@mxtommy/kip/assets/icon-72x72.png',
+        color: ''
+      },
+      {
+        enabled: true,
+        autostart: false,
+        url: '/admin/',
+        label: 'Settings',
+        icon: '/@signalk/app-dock/icon-settings.svg',
+        color: '#78788c'
+      }
+    ]
+  }
+
+  // ─── Detect login state ──────────────────────────────────────────────────────
+  // /signalk/v1/auth/loginStatus is public even when allow_readonly is on.
+  // Anonymous users get a 403 on /plugins/*, so we branch early.
+  let isAnonymous = false
+  try {
+    const res = await fetch('/signalk/v1/auth/loginStatus')
+    if (res.ok) {
+      const data = await res.json()
+      isAnonymous = data.status !== 'loggedIn'
+    }
+  } catch {
+    // If loginStatus itself is unreachable, fall through to the authenticated
+    // path — the fetches below will either succeed or fall back to DEFAULTS.
+  }
+
   // ─── Load config from plugin endpoints ───────────────────────────────────────
   let cfg = { ...DEFAULTS }
-  try {
-    const [configRes, settingsRes] = await Promise.all([
-      fetch('/plugins/signalk-app-dock/config'),
-      fetch('/plugins/signalk-app-dock/settings')
-    ])
-    if (configRes.ok) {
-      const data = await configRes.json()
-      const pluginCfg = data.configuration || data
-      cfg = { ...DEFAULTS, ...pluginCfg }
-    }
-    if (settingsRes.ok) {
-      const data = await settingsRes.json()
-      if (Array.isArray(data.apps) && data.apps.length > 0) {
-        cfg.apps = data.apps
+  if (isAnonymous) {
+    cfg = { ...DEFAULTS, ...ANONYMOUS_DEFAULTS }
+  } else {
+    try {
+      const [configRes, settingsRes] = await Promise.all([
+        fetch('/plugins/signalk-app-dock/config'),
+        fetch('/plugins/signalk-app-dock/settings')
+      ])
+      if (configRes.ok) {
+        const data = await configRes.json()
+        const pluginCfg = data.configuration || data
+        cfg = { ...DEFAULTS, ...pluginCfg }
       }
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        if (Array.isArray(data.apps) && data.apps.length > 0) {
+          cfg.apps = data.apps
+        }
+      }
+    } catch (e) {
+      console.warn('[Dock] Could not load config, using defaults.', e)
     }
-  } catch (e) {
-    console.warn('[Dock] Could not load config, using defaults.', e)
   }
 
   if (!Array.isArray(cfg.apps) || cfg.apps.length === 0) {
@@ -56,6 +109,7 @@
   let currentMode = 'day'
 
   async function fetchCurrentMode() {
+    if (isAnonymous) return
     try {
       const res = await fetch('/plugins/signalk-app-dock/mode')
       if (res.ok) {
@@ -77,6 +131,7 @@
   }
 
   async function toggleNightMode() {
+    if (isAnonymous) return
     await fetchCurrentMode()
     const newMode = currentMode === 'night' ? 'day' : 'night'
     try {
@@ -121,16 +176,23 @@
     }
 
     if (!cfg.apps || cfg.apps.length === 0) {
-      $idleHintText.innerHTML =
-        'No apps configured yet.<br>' +
-        'Open <strong>Admin UI \u2192 Plugin Config \u2192 App Dock</strong><br>' +
-        'and click <strong>Discover Installed Webapps</strong> to get started.'
+      if (isAnonymous) {
+        $idleHintText.innerHTML =
+          'Viewing in read-only mode.<br>' +
+          '<a href="/admin/" style="color:inherit;text-decoration:underline">Log in</a> to customize apps.'
+      } else {
+        $idleHintText.innerHTML =
+          'No apps configured yet.<br>' +
+          'Open <strong>Admin UI \u2192 Plugin Config \u2192 App Dock</strong><br>' +
+          'and click <strong>Discover Installed Webapps</strong> to get started.'
+      }
       return
     }
 
-    $idleHintText.innerHTML =
-      'Double-tap <strong>anywhere</strong> to open the dock' +
-      '<br><br><span style="font-size:12px;opacity:0.6">Configure in Admin UI \u2192 Plugin Config \u2192 App Dock</span>'
+    const footer = isAnonymous
+      ? '<br><br><span style="font-size:12px;opacity:0.6">Read-only view \u2014 <a href="/admin/" style="color:inherit">log in</a> to customize</span>'
+      : '<br><br><span style="font-size:12px;opacity:0.6">Configure in Admin UI \u2192 Plugin Config \u2192 App Dock</span>'
+    $idleHintText.innerHTML = 'Double-tap <strong>anywhere</strong> to open the dock' + footer
   }
 
   function hideIdleHint() {
@@ -627,7 +689,7 @@
   // ─── Init ────────────────────────────────────────────────────────────────────
   buildDock()
 
-  if (cfg.showNightModeButton) {
+  if (cfg.showNightModeButton && !isAnonymous) {
     fetchCurrentMode()
     setInterval(fetchCurrentMode, 5000)
   }
@@ -679,7 +741,7 @@
     }
   }
 
-  setInterval(refreshConfig, 5000)
+  if (!isAnonymous) setInterval(refreshConfig, 5000)
 
   // ─── Welcome tour ────────────────────────────────────────────────────────────
   const $tourOverlay = document.getElementById('tour-overlay')
@@ -696,10 +758,20 @@
     showDock()
   }
 
+  const ANON_TOUR_KEY = 'appDockTourDismissed'
+
   if ($tourGotIt) $tourGotIt.addEventListener('click', hideTour)
   if ($tourDismiss) {
     $tourDismiss.addEventListener('click', async () => {
       hideTour()
+      if (isAnonymous) {
+        try {
+          window.localStorage.setItem(ANON_TOUR_KEY, '1')
+        } catch {
+          // localStorage may be unavailable (private mode, etc.)
+        }
+        return
+      }
       try {
         await fetch('/plugins/signalk-app-dock/dismiss-tour', { method: 'POST' })
       } catch {
@@ -710,25 +782,37 @@
 
   const $tourLink = document.getElementById('tour-link')
   if ($tourLink) {
-    $tourLink.addEventListener('click', (e) => {
-      e.preventDefault()
-      const adminUrl = '/admin/#/serverConfiguration/plugins/signalk-app-dock'
-      hideIdleHint()
-      const $frame = document.createElement('iframe')
-      $frame.allow = 'fullscreen; geolocation'
-      $frame.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-pointer-lock'
-      $frame.style.touchAction = 'auto'
-      $frame.classList.add('active')
-      $iframeContainer.innerHTML = ''
-      Object.keys(iframes).forEach((k) => delete iframes[k])
-      $iframeContainer.appendChild($frame)
-      $frame.src = adminUrl
-      iframes[adminUrl] = $frame
-      hideTour()
-    })
+    if (isAnonymous) {
+      // Anonymous visitors can't reach Plugin Config; replace the link with
+      // plain text so the tour doesn't advertise a dead-end.
+      $tourLink.replaceWith(document.createTextNode('Plugin Config (once logged in)'))
+    } else {
+      $tourLink.addEventListener('click', (e) => {
+        e.preventDefault()
+        const adminUrl = '/admin/#/serverConfiguration/plugins/signalk-app-dock'
+        hideIdleHint()
+        const $frame = document.createElement('iframe')
+        $frame.allow = 'fullscreen; geolocation'
+        $frame.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-pointer-lock'
+        $frame.style.touchAction = 'auto'
+        $frame.classList.add('active')
+        $iframeContainer.innerHTML = ''
+        Object.keys(iframes).forEach((k) => delete iframes[k])
+        $iframeContainer.appendChild($frame)
+        $frame.src = adminUrl
+        iframes[adminUrl] = $frame
+        hideTour()
+      })
+    }
   }
 
-  if (!cfg.tourDismissed) showTour()
+  let anonTourDismissed = false
+  try {
+    anonTourDismissed = window.localStorage.getItem(ANON_TOUR_KEY) === '1'
+  } catch {
+    // localStorage unavailable — show tour every visit in that case
+  }
+  if (!cfg.tourDismissed && !(isAnonymous && anonTourDismissed)) showTour()
 
   const autostartIdx = cfg.apps.findIndex((a) => a.autostart)
   if (autostartIdx >= 0) {
