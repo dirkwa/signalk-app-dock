@@ -104,7 +104,46 @@ const S = {
     color: '#333'
   },
   checkboxField: { width: 16, height: 16, accentColor: '#3b82f6' },
-  hint: { fontSize: 11, color: '#aaa', marginLeft: 8 }
+  hint: { fontSize: 11, color: '#aaa', marginLeft: 8 },
+  customForm: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 8,
+    padding: 12,
+    background: '#f8f9fa',
+    border: '1px solid #e0e0e0',
+    borderRadius: 8,
+    marginBottom: 8
+  },
+  customInput: {
+    padding: '6px 10px',
+    borderRadius: 6,
+    border: '1px solid #ccc',
+    fontSize: 13,
+    background: '#fff',
+    color: '#333',
+    width: '100%',
+    boxSizing: 'border-box'
+  },
+  customRow: { display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1' },
+  badge: {
+    fontSize: 10,
+    padding: '2px 6px',
+    borderRadius: 4,
+    background: '#e0e7ff',
+    color: '#4338ca',
+    fontWeight: 600,
+    flexShrink: 0
+  }
+}
+
+function deriveFaviconUrl(rawUrl) {
+  if (!rawUrl) return ''
+  try {
+    return new URL('/favicon.ico', rawUrl).href
+  } catch {
+    return ''
+  }
 }
 
 function IconPreview({ icon, label, color, size }) {
@@ -316,6 +355,40 @@ export default function PluginConfigurationPanel({ configuration, save }) {
     setApps(apps.map((a, j) => (j === i ? { ...a, autostart: !a.autostart } : { ...a, autostart: false })))
   const removeApp = (i) => setApps(apps.filter((_, j) => j !== i))
 
+  const [customLabel, setCustomLabel] = useState('')
+  const [customUrl, setCustomUrl] = useState('')
+  const [customIcon, setCustomIcon] = useState('')
+  const [customColor, setCustomColor] = useState('')
+
+  const addCustomApp = () => {
+    const url = customUrl.trim()
+    if (!url) {
+      setStatus('Custom URL is required')
+      setStatusError(true)
+      return
+    }
+    const isExternal = /^https?:\/\//i.test(url)
+    const icon = customIcon.trim() || (isExternal ? deriveFaviconUrl(url) : '')
+    const next = [
+      ...apps,
+      {
+        enabled: true,
+        autostart: false,
+        url,
+        label: customLabel.trim() || url,
+        icon,
+        color: customColor.trim() || ''
+      }
+    ]
+    setApps(next)
+    setCustomLabel('')
+    setCustomUrl('')
+    setCustomIcon('')
+    setCustomColor('')
+    setStatus('Custom app added — remember to Save Configuration.')
+    setStatusError(false)
+  }
+
   const onDragStart = (i) => setDragIdx(i)
   const onDragOver = (e, i) => {
     e.preventDefault()
@@ -404,6 +477,46 @@ export default function PluginConfigurationPanel({ configuration, save }) {
         {discovering ? 'Discovering\u2026' : 'Discover Installed Webapps'}
       </button>
       {status && <div style={{ ...S.status, color: statusError ? '#ef4444' : '#10b981' }}>{status}</div>}
+
+      <div style={S.sectionTitle}>Add Custom URL</div>
+      <div style={S.customForm}>
+        <input
+          style={S.customInput}
+          type="text"
+          placeholder="Label (e.g. Grafana)"
+          value={customLabel}
+          onChange={(e) => setCustomLabel(e.target.value)}
+        />
+        <input
+          style={S.customInput}
+          type="text"
+          placeholder="URL (e.g. https://grafana.local or /plugins/foo/)"
+          value={customUrl}
+          onChange={(e) => setCustomUrl(e.target.value)}
+        />
+        <input
+          style={S.customInput}
+          type="text"
+          placeholder="Icon (URL, emoji, or blank for favicon)"
+          value={customIcon}
+          onChange={(e) => setCustomIcon(e.target.value)}
+        />
+        <input
+          style={S.customInput}
+          type="text"
+          placeholder="Background color (optional, e.g. #f46800)"
+          value={customColor}
+          onChange={(e) => setCustomColor(e.target.value)}
+        />
+        <div style={S.customRow}>
+          <span style={S.hint}>
+            Custom URLs are loaded as iframes. Sites that block embedding (X-Frame-Options) will not display.
+          </span>
+          <button style={{ ...S.btn, ...S.btnPrimary, marginLeft: 'auto' }} onClick={addCustomApp}>
+            Add
+          </button>
+        </div>
+      </div>
 
       <div style={S.sectionTitle}>Dock Apps (drag to reorder)</div>
       {apps.length === 0 ? (

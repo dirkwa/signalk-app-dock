@@ -87,7 +87,9 @@
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
-        noAdminAccess = !(data.status === 'loggedIn' && data.userLevel === 'admin')
+        const authOff = data.authenticationRequired === false
+        const isAdmin = data.status === 'loggedIn' && data.userLevel === 'admin'
+        noAdminAccess = !authOff && !isAdmin
         break
       }
     } catch {

@@ -270,6 +270,45 @@ describe('default apps seeding', () => {
     assert.equal(saveCalled, false)
   })
 
+  it('passes external https URLs through to resolved apps unchanged', () => {
+    const app = createMockApp()
+    app.savePluginOptions = (_, cb) => cb(null)
+    const plugin = pluginFactory(app)
+
+    const configured = [
+      {
+        enabled: true,
+        url: 'https://grafana.local/',
+        label: 'Grafana',
+        icon: 'https://grafana.local/favicon.ico',
+        color: '#f46800'
+      }
+    ]
+    plugin.start({ apps: configured })
+
+    const routes = {}
+    const router = {
+      get: (path, handler) => {
+        routes[path] = handler
+      },
+      post: () => {}
+    }
+    plugin.registerWithRouter(router)
+
+    let resolved
+    routes['/settings'](
+      {},
+      {
+        json: (d) => {
+          resolved = d
+        }
+      }
+    )
+    const grafana = resolved.apps.find((a) => a.url === 'https://grafana.local/')
+    assert.equal(grafana.label, 'Grafana')
+    assert.equal(grafana.icon, 'https://grafana.local/favicon.ico')
+  })
+
   it('respects enabled:false when resolving apps', () => {
     const app = createMockApp()
     app.savePluginOptions = (_, cb) => cb(null)
