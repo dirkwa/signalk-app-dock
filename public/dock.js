@@ -80,6 +80,9 @@
   // /plugins/* is admin-gated. Only logged-in admins can read plugin
   // settings — anonymous, readonly and readwrite users all 401/403. We set
   // noAdminAccess accordingly and take the fallback path for all of them.
+  // When authenticationRequired is false (no-auth / dummy-security setups),
+  // /plugins/* is reachable without a login, so treat the visitor as
+  // full-access instead of falling through to the hardcoded fallback list.
   // Try /skServer/loginStatus first, fall back to the legacy /loginStatus.
   let noAdminAccess = false
   for (const url of ['/skServer/loginStatus', '/loginStatus']) {
@@ -87,7 +90,9 @@
       const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
-        noAdminAccess = !(data.status === 'loggedIn' && data.userLevel === 'admin')
+        const authOff = data.authenticationRequired === false
+        const isAdmin = data.status === 'loggedIn' && data.userLevel === 'admin'
+        noAdminAccess = !authOff && !isAdmin
         break
       }
     } catch {
